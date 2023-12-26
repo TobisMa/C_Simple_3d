@@ -21,6 +21,7 @@ struct vec2 {
 
 struct Wall {
     struct vec2 p0, p1;
+    float height;
     struct Color color;
 };
 
@@ -52,13 +53,16 @@ struct vec2 transform(struct vec2 point, struct player *player) {
 }
 
 
-struct vec2 screenCoor(struct vec2 point, struct player *player) {
-    struct vec2 transformed = point;
-    transformed.x *= SCALE;
-    transformed.y *= SCALE;
+struct vec2 screenCoor(struct vec2 point, struct player *player, float wallHeight) {
+    float depth = point.y;
+    float depthScale = 1 / depth * GetScreenHeight();
+
+    struct vec2 transformed = {.x=point.x, .y=wallHeight / 2};
+    transformed.x *= depthScale;
+    transformed.y *= depthScale;
 
     transformed.x += GetScreenWidth() / 2;
-    transformed.y += GetScreenHeight() / 2;
+    transformed.y += 0;
 
     return transformed;
 }
@@ -94,34 +98,42 @@ void updateScreen(struct WallList *wallList, struct player *player) {
     ClearBackground(BACKGROUND_COLOR);
     BeginDrawing();
 
+    int vcenter = GetScreenHeight() / 2;
+
+    struct Color vcenterColor = {100, 100, 100, 255};
+    DrawLine(0, vcenter, GetScreenWidth(), vcenter, vcenterColor);
+
     for (int i = 0; i < wallList->wallCount; i++) {
         struct Wall *wall = &wallList->walls[i];
         struct vec2 p0 = transform(wall->p0, player);
         struct vec2 p1 = transform(wall->p1, player);
-        printf("Wall pos: (%i, %i)\n", p0.x, p0.y);
 
         if (p0.y <= CLIP_DEPTH && p1.y <= CLIP_DEPTH) {
-            p0 = screenCoor(p0, player);
-            p1 = screenCoor(p1, player);
-            DrawLine(p0.x, p0.y, p1.x, p1.y, wall->color);
+            p0 = screenCoor(p0, player, wall->height);
+            p1 = screenCoor(p1, player, wall->height);
         }
         else if (p0.y > CLIP_DEPTH && p1.y > CLIP_DEPTH) {
             continue;
         }
         else {
             struct Wall clippedWall = clipWall(p0, p1, wall->color);
-            struct vec2 p0 = screenCoor(clippedWall.p0, player);
-            struct vec2 p1 = screenCoor(clippedWall.p1, player);
-            DrawLine(p0.x, p0.y, p1.x, p1.y, wall->color);
+            p0 = screenCoor(clippedWall.p0, player, wall->height);
+            p1 = screenCoor(clippedWall.p1, player, wall->height);
+        }
+        // bottom
+        DrawLine(p0.x, vcenter + p0.y, p1.x, vcenter + p1.y, wall->color);
+
+        // top
+        DrawLine(p0.x, vcenter - p0.y, p1.x, vcenter - p1.y, wall->color);
+
+        // vertical
+        if (wall->p0.y > CLIP_DEPTH) {
+            DrawLine(p0.x, vcenter - p0.y, p0.x, vcenter + p0.y, wall->color);
+        }
+        if (wall->p1.y > CLIP_DEPTH) {
+            DrawLine(p1.x, vcenter - p1.y, p1.x, vcenter + p1.y, wall->color);
         }
     }
-
-    struct vec2 playerPos = screenCoor(transform(player->pos, player), player); 
-    Color playerColor = {255, 0, 0, 255};
-    DrawCircle(playerPos.x, playerPos.y, PLAYER_RADIUS, playerColor);
-
-    struct vec2 direction = screenCoor(transform(getPlayerDirection(player), player), player);
-    DrawLine(playerPos.x, playerPos.y, direction.x, direction.y, playerColor);
 
     EndDrawing();
 }
@@ -147,15 +159,15 @@ int main(int argc, char const *argv[])
     }
 
     // triangle:
-    struct Wall w1 = {.p0={.x = 30, .y=50}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}};
+    struct Wall w1 = {.p0={.x = 30, .y=50}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}, .height=5};
     wallList.walls[0] = w1;
     wallList.wallCount++;
 
-    struct Wall w2 = {.p0={.x = 30, .y=50}, .p1={.x = 40, .y=80}, .color={0, 0, 200, 255}};
+    struct Wall w2 = {.p0={.x = 30, .y=50}, .p1={.x = 40, .y=80}, .color={0, 0, 200, 255}, .height=5};
     wallList.walls[1] = w2;
     wallList.wallCount++;
 
-    struct Wall w3 = {.p0={.x = 40, .y=80}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}};
+    struct Wall w3 = {.p0={.x = 40, .y=80}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}, .height=5};
     wallList.walls[2] = w3;
     wallList.wallCount++;
 
@@ -171,10 +183,10 @@ int main(int argc, char const *argv[])
             p.pos.y -= PLAYER_SPEED * sin(p.rotation);
         }
         if (IsKeyDown(KEY_A)) {
-            p.rotation -= PI / 15;
+            p.rotation += PI / 30;
         }
         if (IsKeyDown(KEY_D)) {
-            p.rotation += (PI / 15);
+            p.rotation -= (PI / 30);
         }
 
         if (IsKeyDown(KEY_E)) {
