@@ -11,6 +11,7 @@
 #define SCALE 5
 #define HEADING_LENGTH 30 / SCALE
 #define PLAYER_RADIUS SCALE / 2
+#define CLIP_DEPTH 0.0001
 
 static const Color BACKGROUND_COLOR = {50, 50, 50};
 
@@ -41,13 +42,18 @@ struct vec2 rotatePoint(struct vec2 point, float angle) {
     return rotatedPoint;
 }
 
-struct vec2 screenCoor(struct vec2 point, struct player *player) {
+struct vec2 transform(struct vec2 point, struct player *player) {
     struct vec2 transformed = point;
     transformed.x -= player->pos.x;
     transformed.y -= player->pos.y;
 
     transformed = rotatePoint(transformed, -player->rotation - PI / 2);  // +PI/2 to turn the normalized angle to by 90°; then it is upwards
+    return transformed;
+}
 
+
+struct vec2 screenCoor(struct vec2 point, struct player *player) {
+    struct vec2 transformed = point;
     transformed.x *= SCALE;
     transformed.y *= SCALE;
 
@@ -65,22 +71,56 @@ struct vec2 getPlayerDirection(struct player *player) {
     return heading;
 }
 
+struct Wall clipWall(struct vec2 p0, struct vec2 p1, Color color) {
+    struct vec2 front, back; 
+    if (p1.y > CLIP_DEPTH) {
+        front = p0;
+        back = p1;
+    }
+    else {
+        front = p1;
+        back = p0;
+    }
+
+    float size = front.y - back.y;
+    float percentage = front.y / size;
+    float clipX = front.x + (back.x - front.x) * percentage;
+
+    struct Wall clippedWall = {.p0=front, .p1={.x=clipX, .y=CLIP_DEPTH}, .color=color};    
+    return clippedWall;
+}
+
 void updateScreen(struct WallList *wallList, struct player *player) {
     ClearBackground(BACKGROUND_COLOR);
     BeginDrawing();
 
     for (int i = 0; i < wallList->wallCount; i++) {
         struct Wall *wall = &wallList->walls[i];
-        struct vec2 p0 = screenCoor(wall->p0, player);
-        struct vec2 p1 = screenCoor(wall->p1, player);
-        DrawLine(p0.x, p0.y, p1.x, p1.y, wall->color);
+        struct vec2 p0 = transform(wall->p0, player);
+        struct vec2 p1 = transform(wall->p1, player);
+        printf("Wall pos: (%i, %i)\n", p0.x, p0.y);
+
+        if (p0.y <= CLIP_DEPTH && p1.y <= CLIP_DEPTH) {
+            p0 = screenCoor(p0, player);
+            p1 = screenCoor(p1, player);
+            DrawLine(p0.x, p0.y, p1.x, p1.y, wall->color);
+        }
+        else if (p0.y > CLIP_DEPTH && p1.y > CLIP_DEPTH) {
+            continue;
+        }
+        else {
+            struct Wall clippedWall = clipWall(p0, p1, wall->color);
+            struct vec2 p0 = screenCoor(clippedWall.p0, player);
+            struct vec2 p1 = screenCoor(clippedWall.p1, player);
+            DrawLine(p0.x, p0.y, p1.x, p1.y, wall->color);
+        }
     }
 
-    struct vec2 playerPos = screenCoor(player->pos, player); 
+    struct vec2 playerPos = screenCoor(transform(player->pos, player), player); 
     Color playerColor = {255, 0, 0, 255};
     DrawCircle(playerPos.x, playerPos.y, PLAYER_RADIUS, playerColor);
 
-    struct vec2 direction = screenCoor(getPlayerDirection(player), player);
+    struct vec2 direction = screenCoor(transform(getPlayerDirection(player), player), player);
     DrawLine(playerPos.x, playerPos.y, direction.x, direction.y, playerColor);
 
     EndDrawing();
@@ -100,13 +140,23 @@ int main(int argc, char const *argv[])
         .walls = NULL
     };
 
-    wallList.walls = malloc(sizeof(struct Wall));
+    wallList.walls = malloc(3 * sizeof(struct Wall));
     if (wallList.walls == NULL) {
         printf("Failure creating wall list\n");
         return EXIT_FAILURE;
     }
-    struct Wall w = {.p0={.x = 30, .y=50}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}};
-    wallList.walls[0] = w;
+
+    // triangle:
+    struct Wall w1 = {.p0={.x = 30, .y=50}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}};
+    wallList.walls[0] = w1;
+    wallList.wallCount++;
+
+    struct Wall w2 = {.p0={.x = 30, .y=50}, .p1={.x = 40, .y=80}, .color={0, 0, 200, 255}};
+    wallList.walls[1] = w2;
+    wallList.wallCount++;
+
+    struct Wall w3 = {.p0={.x = 40, .y=80}, .p1={.x = 50, .y=60}, .color={0, 0, 200, 255}};
+    wallList.walls[2] = w3;
     wallList.wallCount++;
 
     struct player p = {.pos = {.x = 0, .y = 0}, .rotation=0};
