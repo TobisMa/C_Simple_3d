@@ -143,7 +143,7 @@ int main(int argc, char const *argv[])
     srand(time(NULL));
     
     SetConfigFlags(FLAG_VSYNC_HINT);
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pong");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Simple 3d world");
 
     SetTargetFPS(30);
 
