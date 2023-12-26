@@ -1,0 +1,21 @@
+{
+    "editor.quickSuggestions": {
+        "other": true,
+        "comments": true,
+        "strings": true
+    },
+    "files.associations": {
+        "*.ejs": "html",
+        "*.ufx": "umlet",
+        "*.dic": "hunspell.dic",
+        "*.s": "asm-intel-x86-generic",
+        "*.tcc": "c",
+        "cmath": "c",
+        "istream": "c",
+        "limits": "c",
+        "memory": "c",
+        "ostream": "c",
+        "streambuf": "c",
+        "tuple": "c"
+    }
+}
